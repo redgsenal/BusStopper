@@ -30,7 +30,6 @@ void setup() {
     Serial.println(F("FONA is OK"));
     Serial.println(F("FONA 3G (European)"));
     Serial.println("ready to start GPRSN...");
-    delay(5000);  
     setGPRSN();
   }else{
     Serial.println(F("Invalid FONA 3G (European)"));
@@ -51,49 +50,71 @@ void sendFonaString(char *send){
 void readline(uint16_t timeout, boolean multiline) {
   uint16_t replyidx = 0;  
   while (timeout--) {
-    if (replyidx >= 254) {
-      //DEBUG_PRINTLN(F("SPACE"));
-      break;
-    }
+    if (replyidx >= 254) {break;}
     while(fonaSS.available()) {
       char c =  fonaSS.read();
       if (c == '\r') continue;
       if (c == 0xA) {
-        if (replyidx == 0)   // the first 0x0A is ignored
-          continue;
-
+        if (replyidx == 0) continue;   // the first 0x0A is ignored
         if (!multiline) {
           timeout = 0;         // the second 0x0A is the end of the line
           break;
         }
       }
-      Serial.println(c);
-      replybuffer[replyidx] = c;
-      replyidx++;
+      replybuffer[replyidx] = c;replyidx++;
     }
     if (timeout == 0) {
       //DEBUG_PRINTLN(F("TIMEOUT"));
       break;
     }
     delay(1);
-  }
-  Serial.println("reply buffer ->");
-  Serial.println(replybuffer);
+  } 
+  replybuffer[replyidx] = 0;  
 }
 
 boolean checkReplyBuffer(char *reply){
   return (strcmp(replybuffer, reply) == 0);
 }
-
+void readPostResponse(){
+  while (!checkReplyBuffer("OK")){sendFonaString("AT+CHTTPSSEND");}
+  Serial.println("Post complete -> HTTP SEND... -> read response...");
+  if (fona.sendParseReply(F("AT+CHTTPSRECV?"), F("+CHTTPSRECV: LEN,"), ',', 0)){
+    while (fona.sendParseReply(F("AT+CHTTPSRECV=512"), F("OK"), ',', 0)){
+      readline(5000, true);
+      Serial.println("buffer-->");
+      Serial.println(replybuffer);
+      size_t sz = strlen(replybuffer);
+      Serial.println(sz);
+      if (sz == 0)
+        break;
+      else{
+        if (sz > 20){
+          boolean validgps = strlen(strstr(replybuffer, "\"valid\":true")) > 0;
+          Serial.println("gps validate here");
+          Serial.println(validgps);
+        }// else skip other responses and keep reading...
+      }
+    }
+    Serial.println("read done");
+  }
+}
+void readFonaSerial(int16_t length){
+  while (length > 0) {
+    while (fona.available()) {
+      Serial.println("-->");
+      Serial.println(length);
+      Serial.write(fona.read());
+      length--;
+      if (!length) break;
+    }
+  }
+}
 void openURL(){
-  delay(1000);
-  flushSerial();
+  delay(500);flushSerial();
   if (sendCmd("AT+CHTTPSOPSE=\"default-environment.rezn3yycxc.us-east-1.elasticbeanstalk.com\",80,1")){
     Serial.println(F("API opened -> Prepare HTTP Send"));
     if (sendCmd("AT+CHTTPSSEND=512", ">")){
-      Serial.println(F("Http send -> post parameters"));
-      delay(100);
-      // setup the POST/GET header 
+      Serial.println(F("Http send -> post parameters"));delay(100);
       sendFonaString("POST /Validate?lon=1.111111&lat=1.222211 HTTP/1.1");
       sendFonaString("Host: default-environment.rezn3yycxc.us-east-1.elasticbeanstalk.com");
       sendFonaString("Connection: keep-alive");
@@ -103,50 +124,32 @@ void openURL(){
       sendFonaString("Vary: Accept-Encoding");
       //sendFonaString("Content-Length: 0");
       Serial.println("waiting ok reply"); 
-      while (!checkReplyBuffer("OK")){
-        sendFonaString("AT+CHTTPSSEND");
-      }
-      delay(500);
-      Serial.println("Post complete -> HTTP SEND...");          
-      Serial.println("read response...");
-      sendFonaString("AT+CHTTPSRECV=300");
+      readPostResponse();
       return;
-    }else{
-      Serial.println(F("Http send fail"));
-    }
-  }else{
-    Serial.println(F("API fail to open"));
-      sendCmd("AT+CHTTPSCLSE");
-  }
+    }else{Serial.println(F("Http send fail"));}
+  }else{Serial.println(F("API fail to open"));sendCmd("AT+CHTTPSCLSE");}
 }
 
-void setGPSValidate(){
-  Serial.println(F("GPRS turned on"));    
+void setGPSValidate(){  
   Serial.println("post sample data");
-  // enable http start
-  if (sendCmd("AT+CHTTPSSTART")){
-      Serial.println(F("HTTP start"));
-      openURL();
-    }else{
-      Serial.println(F("HTTP failed to start"));
-    } 
+  if (sendCmd("AT+CHTTPSSTART")){Serial.println(F("HTTP start"));openURL();
+  }else{
+    Serial.println(F("HTTP failed to start - > restart HTTP start"));setGPRSN();
+  }
 }
 
 void setGPRSN(){
   Serial.println(F("Starting GPRS..."));
-  // M1 setup
-  //fona.setGPRSNetworkSettings(F("sunsurf"), F("65"), F("user123"));
+  // M1 setup//fona.setGPRSNetworkSettings(F("sunsurf"), F("65"), F("user123"));
   // Singtel
+  delay(5000);
   fona.setGPRSNetworkSettings(F("e-ideas"), F(""), F(""));
   if (!fona.enableGPRS(true)){
-    Serial.println(F("GPRS Failed to turn on"));
-    Serial.println(F("re-try GPRS to turn on..."));
-    delay(3000);
-    fona.enableGPRS(false);
-    delay(5000);
+    Serial.println(F("GPRS Failed to turn on -> re-try GPRS to turn on..."));delay(3000);
+    fona.enableGPRS(false);delay(5000);
     setGPRSN();
   }else{
-    setGPSValidate();
+    Serial.println(F("GPRS turned on"));setGPSValidate();
   }
 }
 
@@ -154,19 +157,13 @@ void flushSerial() {
     uint16_t timeoutloop = 0;
     while (timeoutloop++ < 40) {
       while(fonaSS.available()) {
-        fonaSS.read();
-        timeoutloop = 0;  // If char was received reset the timer
-      }
-      delay(1);
+        fonaSS.read();timeoutloop = 0;  // If char was received reset the timer
+      }delay(1);
     }
 }
 
 void loop() {
-  if (fonaSS.available()){
-    Serial.write(fonaSS.read());
-  }
-  if (Serial.available()){
-      fonaSS.write(Serial.read());
-  }  
+  if (fonaSS.available()){Serial.write(fonaSS.read());}
+  if (Serial.available()){fonaSS.write(Serial.read());}  
 }
 
