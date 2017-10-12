@@ -79,7 +79,7 @@ void readPostResponse(){
   while (!checkReplyBuffer("OK")){sendFonaString("AT+CHTTPSSEND");}
   Serial.println("Post complete -> HTTP SEND... -> read response...");
   if (fona.sendParseReply(F("AT+CHTTPSRECV?"), F("+CHTTPSRECV: LEN,"), ',', 0)){
-    while (fona.sendParseReply(F("AT+CHTTPSRECV=512"), F("OK"), ',', 0)){
+    while (fona.sendParseReply(F("AT+CHTTPSRECV=1024"), F("OK"), ',', 0)){
       readline(5000, true);
       Serial.println("buffer-->");
       Serial.println(replybuffer);
@@ -89,7 +89,8 @@ void readPostResponse(){
         break;
       else{
         if (sz > 20){
-          boolean validgps = strlen(strstr(replybuffer, "\"valid\":true")) > 0;
+          String resp = String(replybuffer);
+          boolean validgps = resp.indexOf("\"valid\":false") > -1;
           Serial.println("gps validate here");
           Serial.println(validgps);
         }// else skip other responses and keep reading...
@@ -163,7 +164,14 @@ void flushSerial() {
 }
 
 void loop() {
-  if (fonaSS.available()){Serial.write(fonaSS.read());}
-  if (Serial.available()){fonaSS.write(Serial.read());}  
+  if (Serial.available()){
+    char* c = Serial.read();
+    if (c == '<'){
+      Serial.println("repeat...");
+      setGPRSN();
+    }else
+      fonaSS.write(c);
+  }  
+  if (fonaSS.available()){Serial.write(fonaSS.read());}  
 }
 
