@@ -32,13 +32,14 @@ boolean sendCmd(char *send,uint16_t timeout){
   return fona.sendCheckReply(send, OK_REPLY, timeout);
 }
 boolean sendCmd(char *send){
-  return fona.sendCheckReply(send, OK_REPLY);
+  return fona.sendCheckReply(send, OK_REPLY, 1000);
 }
 boolean sendCmd(char *send, char *reply){
   return fona.sendCheckReply(send, reply);
 }
 void sendFonaString(char *send){
-  Serial.println(send);fonaSS.println(send);readline(100, false);
+  //Serial.println(send);
+  fonaSS.println(send);readline(strlen(send)+2, false);
 }
 void readline(uint16_t timeout, boolean multiline) {
   uint16_t replyidx = 0;  
@@ -59,15 +60,15 @@ void readline(uint16_t timeout, boolean multiline) {
   replybuffer[replyidx] = 0;
 }
 void readPostResponse(){
-  while (!checkReplyBuffer("OK")){sendFonaString("AT+CHTTPSSEND");}
   Serial.println("Post complete -> HTTP SEND... -> read response...");
   if (fona.sendParseReply(F("AT+CHTTPSRECV?"), F("+CHTTPSRECV: LEN,"), ',', 0)){  
     int l = 0;
     while (fona.sendParseReply(F("AT+CHTTPSRECV=512"), F("OK"), ',', 0)){
-      readline(1000, true);size_t sz = strlen(replybuffer);
+      readline(500, true);size_t sz = strlen(replybuffer);
       validgps = strlen(strstr(replybuffer, "\"valid\":true")) > 0;
-      Serial.println("buffer --> ");Serial.println(replybuffer);Serial.println("v -> ");Serial.println(validgps);
-      if ((sz == 0 && ++l > 1) || validgps) break;
+      //Serial.println("buffer --> ");Serial.println(replybuffer);
+      Serial.print("valid gps -> ");Serial.println(validgps);
+      if ((sz == 0 && ++l > 2) || validgps) break;
     }
     Serial.println("read done");
   }
@@ -81,7 +82,8 @@ void postCoordinates(){
       sendFonaString("POST /Validate?lon=1.111111&lat=1.222211 HTTP/1.1");sendFonaString("Host: default-environment.rezn3yycxc.us-east-1.elasticbeanstalk.com");
       sendFonaString("Connection: keep-alive");sendFonaString("Content-Encoding: gzip");
       sendFonaString("Server: Apache-Coyote/1.1");sendFonaString("Content-Type: application/json;charset=UTF-8");
-      sendFonaString("Vary: Accept-Encoding");//sendFonaString("Content-Length: 0");//Serial.println("waiting ok reply"); 
+      sendFonaString("Vary: Accept-Encoding");//Serial.println("waiting ok reply");
+      while (!checkReplyBuffer("OK")){sendFonaString("AT+CHTTPSSEND");} 
       readPostResponse();
   }else{Serial.println(F("Http send fail"));}
 }
@@ -100,7 +102,6 @@ void setGPSValidate(){
     Serial.println(F("HTTP failed to start - > restart HTTP start"));setGPRSN();
   }
 }
-
 void setGPRSN(){
   Serial.println(F("Starting GPRS..."));
   // M1 setup//fona.setGPRSNetworkSettings(F("sunsurf"), F("65"), F("user123"));
@@ -116,7 +117,6 @@ void setGPRSN(){
     Serial.println(F("GPRS turned on"));setGPSValidate();
   }
 }
-
 void flushSerial() {
     uint16_t timeoutloop = 0;
     while (timeoutloop++ < 40) {
@@ -125,7 +125,6 @@ void flushSerial() {
       }delay(1);
     }
 }
-
 void loop() {
   if (Serial.available()){    
     char *c = Serial.read();
