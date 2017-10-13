@@ -44,7 +44,7 @@ void sendFonaString(char *send){
 void readline(uint16_t timeout, boolean multiline) {
   uint16_t replyidx = 0;  
   while (timeout--) {
-    if (replyidx >= 512) {break;}
+    if (replyidx >= sizeof(replybuffer)-1) {break;}
     while(fonaSS.available()) {
       char c =  fonaSS.read();
       if (c == '\r') continue;
