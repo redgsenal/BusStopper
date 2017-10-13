@@ -28,6 +28,9 @@ void setup() {
     Serial.println(F("Invalid FONA 3G (European)"));return;
   }  
 }
+boolean sendCmd(char *send,uint16_t timeout){
+  return fona.sendCheckReply(send, OK_REPLY, timeout);
+}
 boolean sendCmd(char *send){
   return fona.sendCheckReply(send, OK_REPLY);
 }
@@ -62,9 +65,8 @@ void readPostResponse(){
     int l = 0;
     while (fona.sendParseReply(F("AT+CHTTPSRECV=512"), F("OK"), ',', 0)){
       readline(1000, true);size_t sz = strlen(replybuffer);
-      char *p = strstr(replybuffer, "\"valid\":true");
-      validgps = strlen(p) > 0;
-      Serial.println("buffer --> ");Serial.println(replybuffer);Serial.println("v -> ");Serial.println(p);
+      validgps = strlen(strstr(replybuffer, "\"valid\":true")) > 0;
+      Serial.println("buffer --> ");Serial.println(replybuffer);Serial.println("v -> ");Serial.println(validgps);
       if ((sz == 0 && ++l > 1) || validgps) break;
     }
     Serial.println("read done");
@@ -73,21 +75,24 @@ void readPostResponse(){
 boolean checkReplyBuffer(char *reply){
   return (strcmp(replybuffer, reply) == 0);
 }
-void openURL(){
-  delay(500);flushSerial();
-  if (sendCmd("AT+CHTTPSOPSE=\"default-environment.rezn3yycxc.us-east-1.elasticbeanstalk.com\",80,1")){
-    Serial.println(F("API opened -> Prepare HTTP Send"));
-    if (sendCmd("AT+CHTTPSSEND=512", ">")){
+void postCoordinates(){
+  if (sendCmd("AT+CHTTPSSEND=512", ">")){
       Serial.println(F("Http send -> post parameters"));delay(100);
       sendFonaString("POST /Validate?lon=1.111111&lat=1.222211 HTTP/1.1");sendFonaString("Host: default-environment.rezn3yycxc.us-east-1.elasticbeanstalk.com");
       sendFonaString("Connection: keep-alive");sendFonaString("Content-Encoding: gzip");
       sendFonaString("Server: Apache-Coyote/1.1");sendFonaString("Content-Type: application/json;charset=UTF-8");
       sendFonaString("Vary: Accept-Encoding");//sendFonaString("Content-Length: 0");//Serial.println("waiting ok reply"); 
       readPostResponse();
-    }else{Serial.println(F("Http send fail"));}
-  }else{Serial.println(F("API fail to open"));sendCmd("AT+CHTTPSCLSE");}
+  }else{Serial.println(F("Http send fail"));}
 }
-
+void openURL(){
+  delay(500);flushSerial();
+  if (sendCmd("AT+CHTTPSOPSE=\"default-environment.rezn3yycxc.us-east-1.elasticbeanstalk.com\",80,1", 3000)){
+    Serial.println(F("API opened -> Prepare HTTP Send"));
+    postCoordinates();
+  }else{Serial.println(F("API fail to open"));}
+  sendCmd("AT+CHTTPSCLSE");
+}
 void setGPSValidate(){  
   Serial.println("post sample data");
   if (sendCmd("AT+CHTTPSSTART")){Serial.println(F("HTTP start"));openURL();
@@ -122,12 +127,15 @@ void flushSerial() {
 }
 
 void loop() {
-  if (Serial.available()){
-    char* c = Serial.read();
-    if (c == '<'){Serial.println("repeat...");setGPRSN();}
-    else
-      fonaSS.write(c);
-  }  
+  if (Serial.available()){    
+    char *c = Serial.read();
+    if ('<' == c){
+      Serial.println("repeat...");
+      openURL();
+    }else{
+      fonaSS.write(Serial.read());
+    }
+  }
   if (fonaSS.available()){Serial.write(fonaSS.read());}  
 }
 
