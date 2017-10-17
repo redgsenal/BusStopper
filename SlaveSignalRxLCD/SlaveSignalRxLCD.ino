@@ -16,7 +16,7 @@
 #define RFM95_INT 3
 // Change to 434.0 or other frequency, must match RX's freq!
 #define RF95_FREQ 433.0
-#define TX_POWER_LEVEL 10
+#define TX_POWER_LEVEL 23
 // power and state indicator
 #define LED_POWER 13
 #define WAIT_TIME 5000 // 20 seconds
@@ -105,11 +105,9 @@ void loop() {
             out("Sent a reply");
             digitalWrite(LED_POWER, LOW);
             out(">> VALIDATION SENT BACK");
-            currentState = STATE_REQUEST_SIGNAL_VALID;
-            waitingTimeElapsed = 0;
             text("> Signal found <",2,0,true);
             text(" Waiting ",5,1);
-            c = 0;
+            currentState = STATE_REQUEST_SIGNAL_VALID;waitingTimeElapsed = 0; c = 0;
           } else {
             out("invalid token");
           }
@@ -121,19 +119,17 @@ void loop() {
   while(currentState == STATE_REQUEST_SIGNAL_VALID){
     // blink LED blink here; start time elapse count
     // delay accounts for doors and bus proceeding to next stop; ignores other signals for 5 secs
-    delay(1000);blinkState();countlcd();
-    if (waitingTimeElapsed > (WAIT_TIME + 1000)){
+    blinkState();delay(500);blinkState();delay(500);countlcd();
+    if (waitingTimeElapsed > WAIT_TIME){
+      digitalWrite(LED_POWER, HIGH);
       text("Doors are closing",1,0, true);
-      text(">                  <",0,1);delay(2000);      
+      text(">                  <",0,1);delay(2000);
       text(">>>              <<<",0,1);delay(500);
       text(">>>>>          <<<<<",0,1);delay(500);
       text(">>>>>>>>    <<<<<<<<",0,1);delay(500);
       text(">>>>>>>>>><<<<<<<<<<",0,1);delay(500);
-      // waiting time; reset to idle state
-      waitingTimeElapsed = 0;       // reset the counter to 0 so the counting starts over...
-      digitalWrite(LED_POWER, HIGH);
-      currentState = STATE_IDLE;
-      c = 0;
+      // waiting time; reset to idle state; reset the counter to 0 so the counting starts over...
+      waitingTimeElapsed = 0; c = 0; currentState = STATE_IDLE;
       text("*** Welcome ***",2,0, true);
       text(">Waiting for signal<",0,1);
       delay(10000);
@@ -144,7 +140,7 @@ void out(String v){
   Serial.println(v);
 }
 void blinkState(){
-  int ledState = digitalRead(LED_POWER);  // read input value
+  uint8_t ledState = digitalRead(LED_POWER);  // read input value
   ledState = (ledState == HIGH) ? LOW : HIGH;
   digitalWrite(LED_POWER, ledState);
 }
