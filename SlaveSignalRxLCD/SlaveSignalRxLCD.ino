@@ -19,10 +19,13 @@
 #define TX_POWER_LEVEL 23
 // power and state indicator
 #define LED_POWER 13
+#define GPS_STATUS_ADDRESS 8 // connects to GPS; 0 - NO GPGS / in transit ; 1 - GPS found; bus stop near by
 #define WAIT_TIME 5000 // 20 seconds
 #define STATE_IDLE 0xA0
 #define STATE_REQUEST_SIGNAL_VALID 0xA1
 #define STATE_TIMER_COUNT 0xA2
+#define STATE_GPS_VALID 0xA3
+
 unsigned long currentState = STATE_IDLE;
 char* requestRxToken;
 const char RESPONSE_TOKEN[20] = "1234567890123456789";
@@ -32,6 +35,7 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 LiquidCrystal_I2C lcd(0x3f,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 elapsedMillis waitingTimeElapsed;
 uint8_t c = 0;
+uint8_t is_gps_valid = 0;
 void clearlcd(){
   lcd.init();
   lcd.backlight();
@@ -47,10 +51,32 @@ void text(char txt[], uint8_t col = 0, uint8_t row = 0, boolean doclear = false)
   lcd.setCursor(col,row);
   lcd.print(txt);
 }
+void isGPSValid(){
+  // LoRa is a slave
+  out("GPS Event");  
+  Wire.requestFrom(GPS_STATUS_ADDRESS, 20);
+  while(!Wire.available()){
+    Wire.requestFrom(GPS_STATUS_ADDRESS, 20);
+    Serial.println("waiting for GPS data");
+    delay(100);
+  }
+    char c = Wire.read();
+    is_gps_valid = 0;
+    out("GPS available");  
+    if (c != '0'){
+      Serial.println("req read");
+      is_gps_valid = 1;
+      out(">> GPS valid");
+      Serial.println(c);
+    }else{
+      out(">> GPS invalid");
+    }
+  delay(500);
+}
 void setup() {
   pinMode(LED_POWER, OUTPUT);     
-  pinMode(RFM95_RST, OUTPUT);
-  digitalWrite(RFM95_RST, HIGH);
+  pinMode(RFM95_RST, OUTPUT);  
+  //setup i2c for GPS; request the data from GPS
   // while (!Serial); uncomment when debugging
   Serial.begin(9600);
   delay(100);
@@ -74,9 +100,11 @@ void setup() {
   // The default transmitter power is 13dBm, using PA_BOOST.
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
   // you can set transmitter powers from 5 to 23 dBm:
-  rf95.setTxPower(TX_POWER_LEVEL, false);  
+  rf95.setTxPower(TX_POWER_LEVEL, false);
+
   text("*** Welcome ***",2,0, true);
   text(">Waiting for signal<",0,1);
+  Wire.write("true");
 }
 void loop() {
   while(currentState == STATE_IDLE){
@@ -92,24 +120,30 @@ void loop() {
           requestRxToken = (char*)buf;
           out(requestRxToken);
           // compare token if valid
-          if (strcmp(requestRxToken, REQUEST_TOKEN) == 0){
-            Serial.print("RSSI: ");
-            Serial.print(rf95.lastRssi(), DEC);
-            delay(10);
-            // Send a reply
-            delay(200); // may or may not be needed
-            // replay validation message
-            uint8_t data[] = "1234567890123456789";
-            rf95.send(data, sizeof(data));
-            rf95.waitPacketSent();
-            out("Sent a reply");
-            digitalWrite(LED_POWER, LOW);
-            out(">> VALIDATION SENT BACK");
-            text("> Signal found <",2,0,true);
-            text(" Waiting ",5,1);
-            currentState = STATE_REQUEST_SIGNAL_VALID;waitingTimeElapsed = 0; c = 0;
-          } else {
-            out("invalid token");
+          // check if GPS is valid
+          isGPSValid();          
+          if (is_gps_valid){
+            if (strcmp(requestRxToken, REQUEST_TOKEN) == 0){
+              Serial.print("RSSI: ");
+              Serial.print(rf95.lastRssi(), DEC);
+              delay(10);
+              // Send a reply
+              delay(200); // may or may not be needed
+              // replay validation message
+              uint8_t data[] = "1234567890123456789";
+              rf95.send(data, sizeof(data));
+              rf95.waitPacketSent();
+              out("Sent a reply");
+              digitalWrite(LED_POWER, LOW);
+              out(">> VALIDATION SENT BACK");
+              text("> Signal found <",2,0,true);
+              text(" Waiting ",5,1);            
+              currentState = STATE_REQUEST_SIGNAL_VALID;waitingTimeElapsed = 0; c = 0;
+            } else {
+              out("invalid token");
+            }
+          }else{
+            out("GPS invalid");
           }
         } else {
           out("Receive failed");
