@@ -275,9 +275,8 @@ void lora(){
     }
   }
 }
-void requestEvent() // run over and over again
-{
-  Serial.println("request event...");
+void requestEvent() {
+  // Serial.println("request event...");
   // read data from the GPS in the 'main loop'
   char c = GPS.read();
   // if you want to debug, this is a good time to do it!
@@ -314,32 +313,34 @@ void requestEvent() // run over and over again
       // debug to test w/o GPS
       // gpslat = 1.55551926;
       // gpslon = 101.0763351;
-      is_bus_stop = true;
-      gpslat = 1.362332;
-      gpslon = 103.713641;
+      gpslat = 1.33333;
+      gpslon = 103.55555;
     }
     if (GPS.fix) {
       Serial.print("Location: ");
-        Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
-        Serial.print(", ");
-        Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
-        Serial.print("Speed (knots): "); Serial.println(GPS.speed);
-        Serial.print("Angle: "); Serial.println(GPS.angle);
-        Serial.print("Altitude: "); Serial.println(GPS.altitude);
-        Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
-        gpslat = GPS.latitude / 100;
-        gpslon = GPS.longitude / 100;
-        char result[18] = {};
-        sprintf(result, "%.5f,%.5f", gpslat, gpslon);
-        is_bus_stop = is_gps_coordinates_near(GPSCoor(gpslat, gpslon));
-        text("No     ", 9, 2, false);
-        if (is_bus_stop){
-          text("Yes     ", 9, 2, false);
-        }
-        text(result, 0, 3, false);
-    }else{
+      Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
+      Serial.print(", ");
+      Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
+      Serial.print("Speed (knots): "); Serial.println(GPS.speed);
+      Serial.print("Angle: "); Serial.println(GPS.angle);
+      Serial.print("Altitude: "); Serial.println(GPS.altitude);
+      Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
+      gpslat = GPS.latitude / 100;
+      gpslon = GPS.longitude / 100;
+    }
+    char result[18] = {};
+    sprintf(result, "%.5f,%.5f", gpslat, gpslon);
+    is_bus_stop = is_gps_coordinates_near(GPSCoor(gpslat, gpslon));
+    text(result, 0, 3, false);
+    
+    if (!GPS.fix){
       text("No Data", 9, 2, false);
-      text("No GPS", 0, 3, false);
+    }else{
+      if (is_bus_stop){
+        text("Yes       ", 9, 2, false);
+      }else{
+        text("In-transit", 9, 2, false);
+      }      
     }
     delay(1000);
     Serial.println("request");
@@ -349,9 +350,18 @@ void requestEvent() // run over and over again
 // checks if gps distance with tolerable distance range from the list of bus stations
 boolean is_gps_coordinates_near(GPSCoor coor){
   Serial.println("compute distance ");
+  if (DEBUG_GPS){
+    Serial.println("debug gps return true");
+    return true;
+  }
+  if (coor.lon() == 0 && coor.lat() == 0){
+    Serial.println("invalid gps");
+    return false;
+  }
   for(int i = 0; i < NUMBER_OF_STATIONS; ++i){
     Serial.println(i);
-    if (gpsdistance(coor, busstops[i]) <= GPS_STATION_DISTANCE_RANGE){
+    float ds = gpsdistance(coor, busstops[i]);
+    if ((ds >= 0) && (ds <= GPS_STATION_DISTANCE_RANGE)) {
       return true;
     }
   }
@@ -440,7 +450,7 @@ void setup()
   text("Bus stop:", 0, 2, false);
 }
 void loop(){
-  delay(100);  
+  delay(5000);  
   lora();
 }
 
