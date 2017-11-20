@@ -345,6 +345,7 @@ void requestEvent() {
     delay(1000);
     Serial.println("request");
   }
+  delay(100);
 }
 
 // checks if gps distance with tolerable distance range from the list of bus stations
@@ -358,8 +359,7 @@ boolean is_gps_coordinates_near(GPSCoor coor){
     Serial.println("invalid gps");
     return false;
   }
-  for(int i = 0; i < NUMBER_OF_STATIONS; ++i){
-    Serial.println(i);
+  for(int i = 0; i < NUMBER_OF_STATIONS; ++i){    
     float ds = gpsdistance(coor, busstops[i]);
     if ((ds >= 0) && (ds <= GPS_STATION_DISTANCE_RANGE)) {
       return true;
@@ -368,11 +368,13 @@ boolean is_gps_coordinates_near(GPSCoor coor){
   return false;
 }
 float gpsdistance(GPSCoor o1, GPSCoor o2){
-  Serial.print("checking...");
-  Serial.print(o1.coordinates());Serial.print(" - ");
-  Serial.println(o2.coordinates());
   float d = haversine_km(o1.lat(), o1.lon(), o2.lat(), o2.lon());
-  Serial.print("distance: ");Serial.println(d);
+  if (DEBUG_GPS){
+    Serial.print("checking...");
+    Serial.print(o1.coordinates());Serial.print(" - ");
+    Serial.println(o2.coordinates());
+    Serial.print("distance: ");Serial.println(d);
+  }
   return d;
 }
 // calculate haversine distance in kilometers for linear distance; coordinates in degress
@@ -424,7 +426,7 @@ void setup()
   // connect at 115200 so we can read the GPS fast enough and echo without dropping chars
   // also spit it out
   //Serial.begin(115200);
-  Serial.println("Adafruit GPS library basic test!");
+  Serial.println("Adafruit GPS library...");
 
   // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
   GPS.begin(9600);
