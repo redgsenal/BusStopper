@@ -186,6 +186,9 @@ elapsedMillis waitingTimeElapsed;
 uint8_t c = 0;
 uint8_t is_gps_valid = 0;
 
+char cursor_busy[5] = {'-', '|', '+', 'x', '*'};
+int ci = 0;
+
 void clearlcd(){
   lcd.init();
   lcd.backlight();
@@ -209,7 +212,12 @@ void blinkState(){
 void countlcd(){
   lcd.setCursor(9,2);
   lcd.print(++c);   
-} 
+}
+void cursorDisplay(){
+  if (ci >= 5) ci = 0;
+  lcd.setCursor(19,2);
+  lcd.print(String(cursor_busy[ci++]));
+}
 void lora(){
   out("check lora signal");
   while(currentState == STATE_IDLE){
@@ -296,6 +304,7 @@ void requestEvent() {
   if (timer > millis()) timer = millis();
   // approximately every 2 seconds or so, print out the current stats  
   if (millis() - timer > 2000) {
+    cursorDisplay();
     timer = millis(); // reset the timer
     Serial.print("\nTime: ");
     Serial.print(GPS.hour, DEC); Serial.print(':');
