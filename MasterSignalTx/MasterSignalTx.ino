@@ -9,7 +9,7 @@
 // D6
 #define CALL_BUTTON 6
 // D10 - BUTTON LED
-#define LED_INDICATOR 10
+//#define LED_INDICATOR 10
 // D13 - ON LED
 #define LED_POWER 13
 #define STATE_IDLE 0xA0
@@ -37,7 +37,7 @@ void out(String v){
 }
 int checkButton(){
   int ledState = digitalRead(CALL_BUTTON);  // read input value
-  digitalWrite(LED_INDICATOR, ledState);  // turn LED OFF
+  //digitalWrite(LED_INDICATOR, ledState);  // turn LED OFF
   return ledState;
 }
 void sendRequest() {
@@ -85,7 +85,7 @@ void sendRequest() {
 void setup() {
   pinMode(LED_POWER, OUTPUT);  // declare LED as output
   digitalWrite(LED_POWER, HIGH);
-  pinMode(LED_INDICATOR, OUTPUT);  // declare LED as output
+  //pinMode(LED_INDICATOR, OUTPUT);  // declare LED as output
   pinMode(CALL_BUTTON, INPUT);    // declare pushbutton as input
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
@@ -129,12 +129,13 @@ void loop() {
 
   while(currentState == STATE_BUTTON_PRESSED_SEND_REQUEST){
     out("button pressed; send signal");
-    blinkState(50);
+    blinkState(20);
     sendRequest();
     if (waitingTimeElapsed > REQUEST_TIME){
-      digitalWrite(LED_INDICATOR, LOW);
+      //digitalWrite(LED_INDICATOR, LOW);
       digitalWrite(LED_POWER, HIGH);
       currentState = STATE_IDLE;
+      callButtonState = LOW;
       waitingTimeElapsed = 0;
       out("request time out; reset to idle");
     }
@@ -142,7 +143,7 @@ void loop() {
 
   while(currentState == STATE_RESPONSE_RECEIVED){
     blinkState(200);
-    digitalWrite(LED_INDICATOR, HIGH);
+    //digitalWrite(LED_INDICATOR, HIGH);
     if (waitingTimeElapsed > WAIT_TIME){
       digitalWrite(LED_POWER, HIGH);
       // waiting time; reset to idle state
