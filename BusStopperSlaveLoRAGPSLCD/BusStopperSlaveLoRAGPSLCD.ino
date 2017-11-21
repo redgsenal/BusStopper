@@ -184,7 +184,6 @@ const char REQUEST_TOKEN[20] = "ABCDEFGH1JKLMNOPQRS";
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 elapsedMillis waitingTimeElapsed;
 uint8_t c = 0;
-uint8_t is_gps_valid = 0;
 
 char cursor_busy[5] = {'-', '|', '+', 'x', '*'};
 int ci = 0;
@@ -228,14 +227,13 @@ void lora(){
       uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
       uint8_t len = sizeof(buf);
       if (rf95.recv(buf, &len)) {
-        digitalWrite(LED_INDICATOR, HIGH);
         RH_RF95::printBuffer("Received: ", buf, len);
         Serial.print("Got: ");
         requestRxToken = (char*)buf;
         out(requestRxToken);
         // compare token if valid
         // check if GPS is valid        
-        if (is_gps_valid){
+        if (is_bus_stop){
             if (strcmp(requestRxToken, REQUEST_TOKEN) == 0){
               Serial.print("RSSI: ");
               Serial.print(rf95.lastRssi(), DEC);
@@ -247,10 +245,9 @@ void lora(){
               rf95.send(data, sizeof(data));
               rf95.waitPacketSent();
               out("Sent a reply");
-              digitalWrite(LED_INDICATOR, LOW);
               out(">> VALIDATION SENT BACK");
-              text("> Signal found <",2,0,true);
-              text("Boarding...",5,1);            
+              text("> Signal found <",2,0,true);              
+              text("Boarding...",5,1);
               currentState = STATE_REQUEST_SIGNAL_VALID;waitingTimeElapsed = 0; c = 0;
             } else {
               out("invalid token");
@@ -275,11 +272,14 @@ void lora(){
       text(">>>>>          <<<<<",0,1);delay(500);
       text(">>>>>>>>    <<<<<<<<",0,1);delay(500);
       text(">>>>>>>>>><<<<<<<<<<",0,1);delay(500);
+      delay(5000);
       // waiting time; reset to idle state; reset the counter to 0 so the counting starts over...
       waitingTimeElapsed = 0; c = 0; currentState = STATE_IDLE;
       text("*** Bus Stopper ***",0,0, true);
       text(">Waiting for signal<",0,1);
-      delay(10000);
+      text("Bus stop:", 0, 2, false);
+      is_bus_stop = false;
+      digitalWrite(LED_INDICATOR, LOW);      
     }
   }
 }
